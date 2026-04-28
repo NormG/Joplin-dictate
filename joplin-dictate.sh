@@ -38,7 +38,7 @@ while getopts ":p:t:dD:h" opt; do
         d) IS_TODO=1 ;;
         D) DUE_DATE_RAW="$OPTARG"; IS_TODO=1 ;;
         h)
-            sed -n '2,22p' "$0"
+            sed -n '2,20p' "$0"
             exit 0
             ;;
         *)
