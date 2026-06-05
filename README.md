@@ -51,7 +51,7 @@ Clone this repo and put the script (or a symlink to it) somewhere on
 your `$PATH`:
 
 ```bash
-git clone <this-repo-url> ~/projects/joplin-dictate
+git clone https://github.com/NormG/Joplin-dictate.git ~/projects/joplin-dictate
 mkdir -p ~/bin
 ln -s ~/projects/joplin-dictate/joplin-dictate.sh ~/bin/joplin-dictate.sh
 echo 'export PATH="$HOME/bin:$PATH"' >> ~/.bashrc
@@ -131,6 +131,40 @@ For a more accurate model, point `WHISPER_MODEL` at a larger one
 - **Wrong language / poor accuracy** — switch to a larger model
   (`small.en`, `medium.en`) or, for non-English audio, a multilingual
   model like `small`/`medium` and pass `-l <lang>` to whisper-cli.
+
+## Contributing
+
+Issues and pull requests are welcome at
+<https://github.com/NormG/Joplin-dictate>.
+
+If you'd like to contribute a change:
+
+1. Fork the repository and create a feature branch:
+
+   ```bash
+   git checkout -b my-feature
+   ```
+
+2. Make your change. Please follow the existing style:
+   - POSIX-friendly `bash` with `set -euo pipefail`.
+   - Quote variables, prefer `[[ ... ]]` over `[ ... ]`.
+   - Keep the script self-contained — no new runtime dependencies
+     beyond `arecord`, `curl`, `jq`, and `whisper.cpp` unless absolutely
+     necessary.
+
+3. Validate the script before committing:
+
+   ```bash
+   bash -n joplin-dictate.sh          # syntax check
+   shellcheck joplin-dictate.sh       # optional but recommended
+   joplin-dictate.sh -h               # smoke-test the help output
+   ```
+
+4. Commit with a clear message describing *why* the change is needed,
+   then open a pull request against `main`.
+
+For non-trivial changes, please open an issue first to discuss the
+approach.
 
 ## License
 
