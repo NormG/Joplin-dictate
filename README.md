@@ -105,6 +105,19 @@ joplin-dictate.sh -D "tomorrow 9am"     # to-do with due date (implies -d)
 joplin-dictate.sh -h                    # help
 ```
 
+### Recording tips
+
+- **Wait a moment before speaking.** `arecord` needs ~0.5 s to
+  initialise. Starting to speak immediately may clip the first word.
+- **Speak for at least 2–3 seconds.** Very short clips often produce
+  only silence or hallucination tokens, which are filtered out and
+  reported as `No speech detected.`
+- **Speak clearly and close to the microphone.** whisper.cpp works best
+  with a clean signal; background noise can reduce accuracy.
+- **Use a larger model for better accuracy.** The default `base.en` is
+  fast but approximate. `small.en` or `medium.en` give noticeably better
+  results at the cost of a few extra seconds of transcription time.
+
 ### Flags
 
 - `-t TITLE` — use a custom title instead of the first sentence.
@@ -134,15 +147,20 @@ For a more accurate model, point `WHISPER_MODEL` at a larger one
 
 1. `arecord` records mono 16 kHz PCM into a temp WAV (the format
    whisper.cpp expects natively).
-2. Pressing `Ctrl-C` stops the recording cleanly; the script catches
-   `SIGINT` so the rest of the pipeline still runs.
+2. Pressing `Ctrl-C` (shell) or clicking **Stop** (GUI) stops the
+   recording cleanly; the script catches `SIGINT` so the rest of the
+   pipeline still runs.
 3. `whisper-cli` produces a `.txt` transcript.
-4. `jq` builds a JSON payload with the transcript as `body` and either
+4. Known whisper hallucination tokens (`[Blank Audio]`, `[noise]`,
+   `[Music]`, etc.) are stripped from the transcript. If nothing
+   remains, the script prints `No speech detected.` and exits without
+   creating a note.
+5. `jq` builds a JSON payload with the transcript as `body` and either
    the first line or `-t TITLE` as `title`.
-5. `curl` POSTs to `${JOPLIN_HOST}/notes?token=${JOPLIN_TOKEN}`. With
+6. `curl` POSTs to `${JOPLIN_HOST}/notes?token=${JOPLIN_TOKEN}`. With
    `-d`/`-D`, `is_todo` and `todo_due` are added to the payload — Joplin
    uses the same `/notes` endpoint for notes and to-dos.
-6. The temp directory is deleted on exit (success or failure).
+7. The temp directory is deleted on exit (success or failure).
 
 ## GUI (GTK)
 
@@ -279,14 +297,18 @@ gtk-update-icon-cache -f -t ~/.local/share/icons/hicolor/
 
 **Audio**
 
-- **`No speech detected`** — the recording was empty or only silence.
-  Verify your microphone with:
-  ```bash
-  arecord -d 3 /tmp/test.wav && aplay /tmp/test.wav
-  ```
-  If `arecord` picks the wrong device, find the right one with
-  `arecord -l` and set `ALSA_CARD` or edit the script to pass
-  `-D plughw:CARD,DEV` to `arecord`.
+- **`No speech detected`** — the recording captured only silence,
+  background noise, or a whisper hallucination token (`[Blank Audio]`,
+  `[noise]`, etc. — these are filtered automatically and never saved
+  as a note). Common causes and fixes:
+  - *Too short* — speak for at least 2–3 seconds before stopping.
+  - *Wrong timing* — wait ~0.5 s after starting before speaking.
+  - *Mic not working* — verify with:
+    ```bash
+    arecord -d 3 /tmp/test.wav && aplay /tmp/test.wav
+    ```
+  - *Wrong device* — list available devices with `arecord -l` and
+    pass `-D plughw:CARD,DEV` to `arecord` (edit the script or wrap it).
 - **Wrong language / poor accuracy** — switch to a larger model
   (`small.en`, `medium.en`) or, for non-English audio, a multilingual
   model (`small`, `medium`) and pass `-l <lang>` to whisper-cli via
