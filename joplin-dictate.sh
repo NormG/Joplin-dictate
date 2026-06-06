@@ -133,7 +133,8 @@ TEXT="$(sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' "${TXT_BASE}.txt")"
 TEXT="$(printf '%s' "$TEXT" | \
     sed -e 's/\[Blank Audio\]//Ig' \
         -e 's/\[BLANK_AUDIO\]//g' \
-        -e 's/(\s*silence\s*)//Ig' \
+        -e 's/\[ *[Ss]ilence *\]//g' \
+        -e 's/(\s*[Ss]ilence\s*)//Ig' \
         -e 's/\[noise\]//Ig' \
         -e 's/\[Music\]//Ig' \
     | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
@@ -161,9 +162,18 @@ if [[ -n "$DUE_DATE_RAW" ]]; then
     DUE_MS=$(( DUE_EPOCH * 1000 ))
 fi
 
+# Prepend the due date to the note body so it is visible when the note is opened.
+BODY="$TEXT"
+if [[ "$DUE_MS" -gt 0 ]]; then
+    DUE_HUMAN="$(date -d "@$((DUE_MS/1000))" '+%a %-d %b %Y %H:%M')"
+    BODY="Due: ${DUE_HUMAN}
+
+${TEXT}"
+fi
+
 JSON=$(jq -n \
     --arg t "$TITLE" \
-    --arg b "$TEXT" \
+    --arg b "$BODY" \
     --arg p "$PARENT_ID" \
     --argjson todo "$IS_TODO" \
     --argjson due "$DUE_MS" \
