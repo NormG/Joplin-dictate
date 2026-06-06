@@ -128,6 +128,16 @@ fi
 
 TEXT="$(sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' "${TXT_BASE}.txt")"
 
+# Strip whisper hallucination tokens produced for silent or noisy audio.
+# These look like real output but contain no speech content.
+TEXT="$(printf '%s' "$TEXT" | \
+    sed -e 's/\[Blank Audio\]//Ig' \
+        -e 's/\[BLANK_AUDIO\]//g' \
+        -e 's/(\s*silence\s*)//Ig' \
+        -e 's/\[noise\]//Ig' \
+        -e 's/\[Music\]//Ig' \
+    | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
+
 if [[ -z "${TEXT// }" ]]; then
     echo "No speech detected."
     exit 0
