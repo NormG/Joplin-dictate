@@ -114,6 +114,9 @@ joplin-dictate.sh -h                    # help
   reported as `No speech detected.`
 - **Speak clearly and close to the microphone.** whisper.cpp works best
   with a clean signal; background noise can reduce accuracy.
+- **Silence the room.** Background audio — music, TV, conversation —
+  will be transcribed as speech. whisper.cpp cannot separate your voice
+  from other sounds.
 - **Use a larger model for better accuracy.** The default `base.en` is
   fast but approximate. `small.en` or `medium.en` give noticeably better
   results at the cost of a few extra seconds of transcription time.
@@ -150,23 +153,27 @@ For a more accurate model, point `WHISPER_MODEL` at a larger one
 2. Pressing `Ctrl-C` (shell) or clicking **Stop** (GUI) stops the
    recording cleanly; the script catches `SIGINT` so the rest of the
    pipeline still runs.
-3. `whisper-cli` produces a `.txt` transcript.
-4. Known whisper hallucination tokens (`[Blank Audio]`, `[noise]`,
-   `[Music]`, etc.) are stripped from the transcript. If nothing
-   remains, the script prints `No speech detected.` and exits without
-   creating a note.
-5. `jq` builds a JSON payload with the transcript as `body` and either
+3. `whisper-cli` transcribes the WAV using `--no-fallback` (disables
+   temperature fallback, reducing hallucinated words for quiet clips).
+4. Known whisper hallucination tokens (`[Blank Audio]`, `[ Silence ]`,
+   `[noise]`, `[Music]`, etc.) are stripped. If nothing remains, the
+   script prints `No speech detected.` and exits without creating a note.
+5. If a due date was set with `-D`, it is prepended to the note body
+   as `Due: Sat 1 Aug 2026 14:00` so it is visible when the note is
+   opened, not just in Joplin's metadata.
+6. `jq` builds a JSON payload with the transcript as `body` and either
    the first line or `-t TITLE` as `title`.
-6. `curl` POSTs to `${JOPLIN_HOST}/notes?token=${JOPLIN_TOKEN}`. With
+7. `curl` POSTs to `${JOPLIN_HOST}/notes?token=${JOPLIN_TOKEN}`. With
    `-d`/`-D`, `is_todo` and `todo_due` are added to the payload — Joplin
    uses the same `/notes` endpoint for notes and to-dos.
-7. The temp directory is deleted on exit (success or failure).
+8. The temp directory is deleted on exit (success or failure).
 
 ## GUI (GTK)
 
 A GTK 3 front-end is available as `joplin-dictate-gui.py`. It provides a
 full-featured window with a notebook picker, title field, to-do checkbox,
-due-date entry, and a Start / Stop recording button.
+calendar date picker (with hour/minute spinners), and a Start / Stop
+recording button.
 
 ### Extra requirement
 
@@ -313,6 +320,26 @@ gtk-update-icon-cache -f -t ~/.local/share/icons/hicolor/
   (`small.en`, `medium.en`) or, for non-English audio, a multilingual
   model (`small`, `medium`) and pass `-l <lang>` to whisper-cli via
   `WHISPER_MODEL` pointing at the multilingual `.bin`.
+
+## Known limitations
+
+- **Background audio is transcribed.** whisper.cpp transcribes all
+  sound captured by the microphone. Music, TV, or nearby conversation
+  will appear in the note body. Record in a quiet environment.
+- **Short-word hallucinations.** For very short or very quiet
+  recordings whisper occasionally generates common words (`you`,
+  `Thank you.`) that cannot be filtered without risking false positives
+  on real speech. The `--no-fallback` flag reduces but does not
+  eliminate this. Speak for at least 2–3 seconds to avoid it.
+- **Token hallucinations are filtered.** Bracket-style tokens produced
+  by whisper for silence (`[Blank Audio]`, `[ Silence ]`, `[noise]`,
+  `[Music]`) are stripped automatically and never saved to a note.
+- **English only by default.** The `base.en` model is English-only.
+  For other languages use a multilingual model (`base`, `small`, etc.)
+  and override `WHISPER_MODEL`.
+- **No GPU acceleration in the default build.** Transcription runs on
+  CPU. A 10-second clip takes roughly 1 second on a modern desktop;
+  longer recordings scale linearly.
 
 ## Contributing
 
