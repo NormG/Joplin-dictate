@@ -111,6 +111,34 @@ For a more accurate model, point `WHISPER_MODEL` at a larger one
    uses the same `/notes` endpoint for notes and to-dos.
 6. The temp directory is deleted on exit (success or failure).
 
+## GUI (GTK)
+
+A GTK 3 front-end is available as `joplin-dictate-gui.py`. It provides a
+full-featured window with a notebook picker, title field, to-do checkbox,
+due-date entry, and a Start / Stop recording button.
+
+### Extra requirement
+
+```bash
+sudo dnf install python3-gobject          # Fedora
+sudo apt install python3-gi gir1.2-gtk-3.0  # Debian / Ubuntu
+```
+
+### Running the GUI
+
+```bash
+python3 joplin-dictate-gui.py
+# or, if you've made it executable:
+./joplin-dictate-gui.py
+```
+
+All environment variables (`JOPLIN_TOKEN`, `JOPLIN_HOST`, `WHISPER_DIR`,
+`WHISPER_MODEL`) work exactly the same as with the shell script.
+
+The GUI fetches your notebook list from the Joplin Web Clipper API on
+startup and falls back gracefully if Joplin is not running (the default
+notebook is used instead).
+
 ## Tips
 
 - If `arecord` picks the wrong microphone, find the right device with
