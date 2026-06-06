@@ -105,10 +105,11 @@ class DictateWindow(Gtk.Window):
         self._due_entry.set_hexpand(True)
         grid.attach(self._due_entry, 1, 3, 1, 1)
 
-        # Record / Stop button
+        # Record / Stop button — disabled until all startup checks pass
         self._rec_btn = Gtk.Button(label='▶  Start Recording')
         self._rec_btn.get_style_context().add_class('suggested-action')
         self._rec_btn.set_size_request(-1, 52)
+        self._rec_btn.set_sensitive(False)
         self._rec_btn.connect('clicked', self._on_rec_clicked)
         vbox.pack_start(self._rec_btn, False, False, 4)
 
@@ -166,36 +167,80 @@ class DictateWindow(Gtk.Window):
         return shutil.which('joplin') is not None
 
     def _check_env(self) -> bool:
+        """Synchronous pre-flight checks (fast, file-system only)."""
+        self._set_status('Checking environment…')
+
         if not self._joplin_installed():
-            self._set_status(
-                '⚠  Joplin not found — install it from joplinapp.org first.'
-            )
-            self._rec_btn.set_sensitive(False)
+            self._set_status('⚠  Joplin not found — install from joplinapp.org.')
             return False
+
         if not JOPLIN_TOKEN:
-            self._set_status('⚠  JOPLIN_TOKEN not set — export it before running.')
-            self._rec_btn.set_sensitive(False)
+            self._set_status('⚠  JOPLIN_TOKEN not set — check ~/.bashrc.')
             return False
+
+        # whisper-cli binary
+        whisper_dir = Path(os.environ.get('WHISPER_DIR',
+                                          str(Path.home() / 'whisper.cpp')))
+        whisper_bin = whisper_dir / 'build' / 'bin' / 'whisper-cli'
+        if not whisper_bin.exists():
+            self._set_status(
+                f'⚠  whisper-cli not found — build whisper.cpp first '
+                f'(cmake --build {whisper_dir}/build).'
+            )
+            return False
+
+        # Whisper model
+        whisper_model = Path(os.environ.get(
+            'WHISPER_MODEL', str(whisper_dir / 'models' / 'ggml-base.en.bin')))
+        if not whisper_model.exists():
+            self._set_status(
+                f'⚠  Whisper model not found: {whisper_model.name} — '
+                f'run download-ggml-model.sh base.en'
+            )
+            return False
+
         if not SCRIPT.exists():
             self._set_status(f'⚠  Script not found: {SCRIPT}')
-            self._rec_btn.set_sensitive(False)
             return False
-        threading.Thread(target=self._load_notebooks_bg, daemon=True).start()
+
+        # All file checks passed — now ping Web Clipper asynchronously
+        self._set_status('Connecting to Joplin…')
+        threading.Thread(target=self._check_clipper_and_load, daemon=True).start()
         return False  # one-shot idle callback
 
-    def _load_notebooks_bg(self) -> None:
+    def _check_clipper_and_load(self) -> None:
+        """Background: verify Web Clipper is reachable, then load notebooks."""
+        try:
+            urllib.request.urlopen(f'{JOPLIN_HOST}/ping', timeout=4)
+        except Exception:
+            GLib.idle_add(
+                self._set_status,
+                '⚠  Joplin Web Clipper not reachable — '
+                'start Joplin and enable Web Clipper (Tools → Options → Web Clipper).'
+            )
+            return
+
+        # Clipper is up — load notebooks
         try:
             notebooks = _fetch_notebooks()
             GLib.idle_add(self._populate_notebooks, notebooks)
         except Exception as exc:
             GLib.idle_add(
                 self._set_status,
-                f'Notebook list unavailable ({exc}); default will be used.',
+                f'Notebooks unavailable ({exc}); default will be used.',
             )
+
+        GLib.idle_add(self._on_env_ready)
 
     def _populate_notebooks(self, notebooks: list) -> bool:
         for nb_id, title in notebooks:
             self._nb_combo.append(nb_id, title)
+        return False
+
+    def _on_env_ready(self) -> bool:
+        """Called once all checks pass — enable the record button."""
+        self._set_status('Ready.')
+        self._rec_btn.set_sensitive(True)
         return False
 
     # ── recording control ─────────────────────────────────────────────────
