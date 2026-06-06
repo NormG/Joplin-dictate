@@ -12,6 +12,7 @@ import gi
 gi.require_version('Gtk', '3.0')
 from gi.repository import Gtk, GLib, Pango
 
+import datetime
 import json
 import os
 import signal
@@ -97,13 +98,51 @@ class DictateWindow(Gtk.Window):
         self._todo_check.connect('toggled', self._on_todo_toggled)
         grid.attach(self._todo_check, 1, 2, 1, 1)
 
-        # Due date (only active when to-do is ticked)
+        # Due date — calendar picker + HH:MM spinners (active only when to-do is ticked)
         grid.attach(lbl('Due date:'), 0, 3, 1, 1)
-        self._due_entry = Gtk.Entry()
-        self._due_entry.set_placeholder_text('"tomorrow 9am",  "next monday",  …')
-        self._due_entry.set_sensitive(False)
-        self._due_entry.set_hexpand(True)
-        grid.attach(self._due_entry, 1, 3, 1, 1)
+        due_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=4)
+
+        self._due_date_btn = Gtk.Button(label='— no due date —')
+        self._due_date_btn.set_sensitive(False)
+        self._due_date_btn.set_hexpand(True)
+        self._due_date_btn.connect('clicked', self._on_due_date_clicked)
+        due_box.pack_start(self._due_date_btn, True, True, 0)
+
+        self._due_hour = Gtk.SpinButton.new_with_range(0, 23, 1)
+        self._due_hour.set_value(9)
+        self._due_hour.set_width_chars(2)
+        self._due_hour.set_numeric(True)
+        self._due_hour.set_sensitive(False)
+        due_box.pack_start(self._due_hour, False, False, 0)
+        due_box.pack_start(Gtk.Label(label=':'), False, False, 2)
+        self._due_min = Gtk.SpinButton.new_with_range(0, 59, 1)
+        self._due_min.set_value(0)
+        self._due_min.set_width_chars(2)
+        self._due_min.set_numeric(True)
+        self._due_min.set_increments(5, 15)
+        self._due_min.set_sensitive(False)
+        due_box.pack_start(self._due_min, False, False, 0)
+
+        grid.attach(due_box, 1, 3, 1, 1)
+
+        # Calendar popover (created here so it can reference due_date_btn)
+        self._due_date_val: datetime.date | None = None
+        self._cal = Gtk.Calendar()
+        cal_vbox = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
+        cal_vbox.set_border_width(8)
+        cal_vbox.pack_start(self._cal, False, False, 0)
+        btn_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=4)
+        clear_btn = Gtk.Button(label='Clear')
+        clear_btn.connect('clicked', self._on_cal_clear)
+        btn_row.pack_start(clear_btn, True, True, 0)
+        set_btn = Gtk.Button(label='Set date')
+        set_btn.get_style_context().add_class('suggested-action')
+        set_btn.connect('clicked', self._on_cal_set)
+        btn_row.pack_start(set_btn, True, True, 0)
+        cal_vbox.pack_start(btn_row, False, False, 0)
+        cal_vbox.show_all()
+        self._cal_pop = Gtk.Popover.new(self._due_date_btn)
+        self._cal_pop.add(cal_vbox)
 
         # Record / Stop button — disabled until all startup checks pass
         self._rec_btn = Gtk.Button(label='▶  Start Recording')
@@ -125,9 +164,35 @@ class DictateWindow(Gtk.Window):
 
     def _on_todo_toggled(self, btn: Gtk.CheckButton) -> None:
         active = btn.get_active()
-        self._due_entry.set_sensitive(active)
+        self._due_date_btn.set_sensitive(active)
         if not active:
-            self._due_entry.set_text('')
+            self._on_cal_clear()
+
+    def _on_due_date_clicked(self, _btn: Gtk.Button) -> None:
+        """Open the calendar popover, pre-selecting any previously chosen date."""
+        if self._due_date_val:
+            self._cal.select_month(self._due_date_val.month - 1,
+                                   self._due_date_val.year)
+            self._cal.select_day(self._due_date_val.day)
+        self._cal_pop.popup()
+
+    def _on_cal_set(self, _btn: Gtk.Button) -> None:
+        """Confirm the calendar selection and update the date button label."""
+        year, month, day = self._cal.get_date()
+        self._due_date_val = datetime.date(year, month + 1, day)
+        self._due_date_btn.set_label(
+            self._due_date_val.strftime('%-d %b %Y'))
+        self._due_hour.set_sensitive(True)
+        self._due_min.set_sensitive(True)
+        self._cal_pop.popdown()
+
+    def _on_cal_clear(self, _btn: Gtk.Button | None = None) -> None:
+        """Reset the due date to 'no due date'."""
+        self._due_date_val = None
+        self._due_date_btn.set_label('— no due date —')
+        self._due_hour.set_sensitive(False)
+        self._due_min.set_sensitive(False)
+        self._cal_pop.popdown()
 
     def _on_rec_clicked(self, _btn: Gtk.Button) -> None:
         if self._recording:
@@ -257,8 +322,14 @@ class DictateWindow(Gtk.Window):
             cmd += ['-p', nb_id]
 
         if self._todo_check.get_active():
-            due = self._due_entry.get_text().strip()
-            cmd += (['-D', due] if due else ['-d'])
+            if self._due_date_val:
+                h = int(self._due_hour.get_value())
+                m = int(self._due_min.get_value())
+                # Always pass an unambiguous ISO datetime string to -D
+                due_str = self._due_date_val.strftime(f'%Y-%m-%d {h:02d}:{m:02d}')
+                cmd += ['-D', due_str]
+            else:
+                cmd.append('-d')
 
         try:
             self._proc = subprocess.Popen(
