@@ -193,4 +193,6 @@ else
     echo "Created Joplin note: $NOTE_ID"
 fi
 echo "Title: $TITLE"
-[[ "$DUE_MS" -gt 0 ]] && echo "Due:   $(date -d "@$((DUE_MS/1000))")"
+if [[ "$DUE_MS" -gt 0 ]]; then
+    echo "Due:   $(date -d "@$((DUE_MS/1000))")"
+fi

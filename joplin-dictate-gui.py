@@ -296,12 +296,14 @@ class DictateWindow(Gtk.Window):
         stdout, _ = self._proc.communicate()
         rc        = self._proc.returncode
         text      = stdout.decode(errors='replace').strip()
+        summary   = _summarise_output(text)
 
-        if rc == 0:
-            msg = _summarise_output(text)
+        # Treat as success when the note was actually created, even if the
+        # script exited non-zero (e.g. a set -e edge case on the last line).
+        if rc == 0 or 'Created Joplin' in text:
+            msg = summary
         else:
-            summary = _summarise_output(text) if text else f'exit code {rc}'
-            msg = f'Error: {summary}'
+            msg = f'Error: {summary}' if text else f'Error (exit {rc}).'
 
         GLib.idle_add(self._after_proc, msg)
 
