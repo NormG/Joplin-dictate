@@ -49,6 +49,26 @@ while getopts ":p:t:dD:h" opt; do
 done
 
 # --- sanity checks --------------------------------------------------------
+# 1. Joplin must be installed
+joplin_installed() {
+    # Standard AppImage location (official install script)
+    [[ -f "$HOME/.joplin/Joplin.AppImage" ]] && return 0
+    # AppImage anywhere in ~ or ~/Applications
+    compgen -G "$HOME/Joplin*.AppImage" >/dev/null 2>&1 && return 0
+    compgen -G "$HOME/Applications/Joplin*.AppImage" >/dev/null 2>&1 && return 0
+    # Flatpak
+    flatpak list --columns=application 2>/dev/null | grep -qi 'joplin' && return 0
+    # System/PATH executable (e.g. npm install -g joplin)
+    command -v joplin >/dev/null 2>&1 && return 0
+    return 1
+}
+if ! joplin_installed; then
+    echo "Joplin does not appear to be installed." >&2
+    echo "Install it from https://joplinapp.org/help/install/ then" >&2
+    echo "enable the Web Clipper: Tools -> Options -> Web Clipper." >&2
+    exit 1
+fi
+
 if [[ -z "${JOPLIN_TOKEN:-}" ]]; then
     echo "JOPLIN_TOKEN is not set. Export it from the Joplin Web Clipper settings." >&2
     exit 1

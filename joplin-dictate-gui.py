@@ -140,7 +140,38 @@ class DictateWindow(Gtk.Window):
 
     # ── environment check (runs once after window is shown) ───────────────
 
+    @staticmethod
+    def _joplin_installed() -> bool:
+        """Return True if a Joplin installation can be found on this machine."""
+        import shutil
+        home = Path.home()
+        # AppImage — standard location used by the official install script
+        candidates = [home / '.joplin' / 'Joplin.AppImage']
+        # AppImage in home dir or ~/Applications
+        for pattern in ('Joplin*.AppImage', 'Applications/Joplin*.AppImage'):
+            candidates.extend(home.glob(pattern))
+        if any(p.exists() for p in candidates):
+            return True
+        # Flatpak
+        try:
+            out = subprocess.run(
+                ['flatpak', 'list', '--columns=application'],
+                capture_output=True, text=True, timeout=3,
+            ).stdout
+            if 'joplin' in out.lower():
+                return True
+        except (FileNotFoundError, subprocess.TimeoutExpired):
+            pass
+        # System / PATH executable (e.g. npm install -g joplin)
+        return shutil.which('joplin') is not None
+
     def _check_env(self) -> bool:
+        if not self._joplin_installed():
+            self._set_status(
+                '⚠  Joplin not found — install it from joplinapp.org first.'
+            )
+            self._rec_btn.set_sensitive(False)
+            return False
         if not JOPLIN_TOKEN:
             self._set_status('⚠  JOPLIN_TOKEN not set — export it before running.')
             self._rec_btn.set_sensitive(False)
