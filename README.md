@@ -15,20 +15,40 @@ service.
 - A working `whisper.cpp` build, with at least one model downloaded
 - The Joplin desktop app with the **Web Clipper** service enabled
 
-On Fedora the system packages can be installed with:
+### 1. System packages
+
+On Fedora:
 
 ```bash
-sudo dnf install -y git cmake gcc-c++ make sox alsa-utils jq curl
+sudo dnf install -y git cmake gcc-c++ make alsa-utils jq curl fuse-libs
 ```
 
-Build whisper.cpp and download a model:
+> `fuse-libs` is required to run the Joplin AppImage on Fedora.
+
+On Debian / Ubuntu:
+
+```bash
+sudo apt install -y git cmake g++ make alsa-utils jq curl libfuse2
+```
+
+### 2. Install Joplin
+
+Use the official install script (downloads the AppImage to `~/.joplin/`):
+
+```bash
+curl -s https://raw.githubusercontent.com/laurent22/joplin/dev/Joplin_install_and_update.sh | bash
+```
+
+Then launch Joplin once so it creates its configuration, and enable the
+Web Clipper (see [Configuring Joplin](#configuring-joplin) below).
+
+### 3. Build whisper.cpp and download a model
 
 ```bash
 git clone https://github.com/ggml-org/whisper.cpp.git ~/whisper.cpp
-cd ~/whisper.cpp
-cmake -B build
-cmake --build build -j --config Release
-bash ./models/download-ggml-model.sh base.en   # or small.en, medium.en, etc.
+cmake -S ~/whisper.cpp -B ~/whisper.cpp/build -DCMAKE_BUILD_TYPE=Release
+cmake --build ~/whisper.cpp/build -j$(nproc)
+bash ~/whisper.cpp/models/download-ggml-model.sh base.en   # or small.en, medium.en, etc.
 ```
 
 ## Configuring Joplin
@@ -36,14 +56,27 @@ bash ./models/download-ggml-model.sh base.en   # or small.en, medium.en, etc.
 1. Open Joplin → **Tools → Options → Web Clipper**.
 2. Click **Enable Web Clipper Service**. The default port is `41184`.
 3. Copy the **authorisation token** shown on that screen.
-4. Export it in your shell (e.g. add to `~/.bashrc`):
+4. Add the following to `~/.bashrc` so the token is always available and
+   stays current even if you later renew it from the Joplin UI:
 
    ```bash
-   export JOPLIN_TOKEN="paste-token-here"
+   # Joplin Web Clipper token — read from Joplin's own config file
+   export JOPLIN_TOKEN
+   JOPLIN_TOKEN=$(python3 -c "
+   import json, pathlib
+   cfg = pathlib.Path.home() / '.config/joplin-desktop/settings.json'
+   try:
+       print(json.loads(cfg.read_text()).get('api.token', ''))
+   except Exception:
+       pass
+   " 2>/dev/null)
    ```
 
-> **Tip:** If you ever paste the token somewhere public, rotate it from
-> the same screen with **Renew authorisation token**.
+   Then reload your shell: `source ~/.bashrc`
+
+> **Tip:** If you ever expose the token accidentally, rotate it from
+> the same screen with **Renew authorisation token**. The `~/.bashrc`
+> snippet above will automatically pick up the new value.
 
 ## Installation
 
@@ -150,10 +183,14 @@ notebook is used instead).
 
 ## Troubleshooting
 
+- **`Joplin does not appear to be installed`** — install Joplin using
+  the official script (see [Requirements](#requirements)). On Fedora,
+  also install `fuse-libs` first (`sudo dnf install -y fuse-libs`).
 - **`Cannot reach Joplin Web Clipper at http://127.0.0.1:41184`** —
   Joplin is not running, or the Web Clipper service is disabled. Check
   Tools → Options → Web Clipper.
-- **`JOPLIN_TOKEN is not set`** — export the token (see above).
+- **`JOPLIN_TOKEN is not set`** — add the dynamic export to `~/.bashrc`
+  (see [Configuring Joplin](#configuring-joplin)) and run `source ~/.bashrc`.
 - **`No speech detected`** — the recording was empty or only silence.
   Verify your mic with `arecord -d 3 test.wav && aplay test.wav`.
 - **Wrong language / poor accuracy** — switch to a larger model
