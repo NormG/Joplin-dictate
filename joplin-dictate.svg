@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256">
+  <!-- Rounded square background -->
+  <rect width="256" height="256" rx="52" ry="52" fill="#1C6EA4"/>
+
+  <!-- Subtle inner gradient ring -->
+  <rect width="256" height="256" rx="52" ry="52"
+        fill="none" stroke="#3B8FCC" stroke-width="6" opacity="0.5"/>
+
+  <!-- Microphone capsule (rounded rectangle) -->
+  <rect x="100" y="40" width="56" height="108" rx="28" ry="28" fill="white"/>
+
+  <!-- Microphone grille lines (decorative) -->
+  <line x1="100" y1="90"  x2="156" y2="90"  stroke="#1C6EA4" stroke-width="3" opacity="0.25"/>
+  <line x1="100" y1="106" x2="156" y2="106" stroke="#1C6EA4" stroke-width="3" opacity="0.25"/>
+  <line x1="100" y1="122" x2="156" y2="122" stroke="#1C6EA4" stroke-width="3" opacity="0.25"/>
+
+  <!-- Stand arc -->
+  <path d="M 68 128 Q 68 192 128 192 Q 188 192 188 128"
+        fill="none" stroke="white" stroke-width="13" stroke-linecap="round"
+        stroke-linejoin="round"/>
+
+  <!-- Vertical stem -->
+  <line x1="128" y1="192" x2="128" y2="218"
+        stroke="white" stroke-width="13" stroke-linecap="round"/>
+
+  <!-- Base -->
+  <line x1="92" y1="218" x2="164" y2="218"
+        stroke="white" stroke-width="13" stroke-linecap="round"/>
+
+  <!-- Small note badge (bottom-right) -->
+  <circle cx="194" cy="194" r="28" fill="#F4A01C"/>
+  <rect  x="183" y="184" width="22" height="3" rx="1.5" fill="white"/>
+  <rect  x="183" y="192" width="22" height="3" rx="1.5" fill="white"/>
+  <rect  x="183" y="200" width="14" height="3" rx="1.5" fill="white"/>
+</svg>

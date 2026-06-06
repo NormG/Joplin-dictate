@@ -168,34 +168,129 @@ python3 joplin-dictate-gui.py
 All environment variables (`JOPLIN_TOKEN`, `JOPLIN_HOST`, `WHISPER_DIR`,
 `WHISPER_MODEL`) work exactly the same as with the shell script.
 
-The GUI fetches your notebook list from the Joplin Web Clipper API on
-startup and falls back gracefully if Joplin is not running (the default
-notebook is used instead).
+### Startup checks
+
+The GUI runs a pre-flight check on every launch. The record button stays
+disabled until every check passes. The status bar reports each failure
+with a specific, actionable message:
+
+- `⚠ Joplin not found` — install Joplin (see [Requirements](#requirements))
+- `⚠ JOPLIN_TOKEN not set` — add the export to `~/.bashrc` (see [Configuring Joplin](#configuring-joplin))
+- `⚠ whisper-cli not found` — build whisper.cpp (see [Requirements](#requirements))
+- `⚠ Whisper model not found` — download a model with `download-ggml-model.sh`
+- `⚠ Joplin Web Clipper not reachable` — start Joplin and enable Web Clipper
+- `Ready.` — all checks passed, the button is enabled
+
+### GNOME launcher
+
+To add Joplin Dictate to your application grid and Activities search:
+
+```bash
+# 1. Install the icon (bundled in the repo)
+mkdir -p ~/.local/share/icons/hicolor/scalable/apps
+cp joplin-dictate.svg ~/.local/share/icons/hicolor/scalable/apps/
+
+# 2. Create the wrapper script (reads JOPLIN_TOKEN automatically)
+mkdir -p ~/.local/bin
+cat > ~/.local/bin/joplin-dictate <<'SH'
+#!/usr/bin/env bash
+JOPLIN_TOKEN=$(python3 -c "
+import json, pathlib
+cfg = pathlib.Path.home() / '.config/joplin-desktop/settings.json'
+try:
+    print(json.loads(cfg.read_text()).get('api.token', ''))
+except Exception:
+    pass
+" 2>/dev/null)
+export JOPLIN_TOKEN
+exec python3 "$HOME/projects/joplin-dictate/joplin-dictate-gui.py" "$@"
+SH
+chmod +x ~/.local/bin/joplin-dictate
+
+# 3. Install the .desktop entry
+mkdir -p ~/.local/share/applications
+cat > ~/.local/share/applications/joplin-dictate.desktop <<'EOF'
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=Joplin Dictate
+GenericName=Voice Note Recorder
+Comment=Record voice notes and send them straight to Joplin
+Exec=/home/USER/.local/bin/joplin-dictate
+Icon=joplin-dictate
+Terminal=false
+Categories=AudioVideo;Utility;
+Keywords=joplin;note;dictate;voice;microphone;record;transcribe;whisper;
+StartupNotify=true
+EOF
+# Replace USER with your actual username
+sed -i "s|/home/USER/|$HOME/|g" ~/.local/share/applications/joplin-dictate.desktop
+
+update-desktop-database ~/.local/share/applications/
+gtk-update-icon-cache -f -t ~/.local/share/icons/hicolor/
+```
+
+> **Note:** Edit the `Exec=` path in the wrapper script if you cloned
+> the repo somewhere other than `~/projects/joplin-dictate`.
 
 ## Tips
 
-- If `arecord` picks the wrong microphone, find the right device with
-  `arecord -l` and pass `-D plughw:CARD,DEV` (edit the script or wrap it).
 - Bind `joplin-dictate.sh` to a global keyboard shortcut in your desktop
   environment so dictation is one keypress away.
+- For a more accurate model, point `WHISPER_MODEL` at a larger binary
+  (`ggml-small.en.bin`, `ggml-medium.en.bin`).
 - For real-time/streaming transcription, look at whisper.cpp's
   `whisper-stream` example.
 
 ## Troubleshooting
 
-- **`Joplin does not appear to be installed`** — install Joplin using
-  the official script (see [Requirements](#requirements)). On Fedora,
-  also install `fuse-libs` first (`sudo dnf install -y fuse-libs`).
-- **`Cannot reach Joplin Web Clipper at http://127.0.0.1:41184`** —
-  Joplin is not running, or the Web Clipper service is disabled. Check
-  Tools → Options → Web Clipper.
-- **`JOPLIN_TOKEN is not set`** — add the dynamic export to `~/.bashrc`
+**Joplin**
+
+- **`Joplin does not appear to be installed`** (shell) /
+  **`⚠ Joplin not found`** (GUI) —
+  install Joplin using the official script (see [Requirements](#requirements)).
+  On Fedora, install `fuse-libs` first: `sudo dnf install -y fuse-libs`.
+- **`Cannot reach Joplin Web Clipper`** (shell) /
+  **`⚠ Joplin Web Clipper not reachable`** (GUI) —
+  Joplin is not running, or Web Clipper is disabled.
+  Start Joplin and go to Tools → Options → Web Clipper → Enable.
+- **`JOPLIN_TOKEN is not set`** (shell) /
+  **`⚠ JOPLIN_TOKEN not set`** (GUI) —
+  add the dynamic export snippet to `~/.bashrc`
   (see [Configuring Joplin](#configuring-joplin)) and run `source ~/.bashrc`.
+
+**whisper.cpp**
+
+- **`Required command not found: …/whisper-cli`** (shell) /
+  **`⚠ whisper-cli not found`** (GUI) —
+  whisper.cpp has not been built yet. Run:
+  ```bash
+  cmake -S ~/whisper.cpp -B ~/whisper.cpp/build -DCMAKE_BUILD_TYPE=Release
+  cmake --build ~/whisper.cpp/build -j$(nproc)
+  ```
+  If `~/whisper.cpp` does not exist, clone it first (see [Requirements](#requirements)).
+- **`Whisper model not found`** (shell) /
+  **`⚠ Whisper model not found`** (GUI) —
+  download a model:
+  ```bash
+  bash ~/whisper.cpp/models/download-ggml-model.sh base.en
+  ```
+  Or point `WHISPER_MODEL` at an existing `.bin` file.
+
+**Audio**
+
 - **`No speech detected`** — the recording was empty or only silence.
-  Verify your mic with `arecord -d 3 test.wav && aplay test.wav`.
+  Verify your microphone with:
+  ```bash
+  arecord -d 3 /tmp/test.wav && aplay /tmp/test.wav
+  ```
+  If `arecord` picks the wrong device, find the right one with
+  `arecord -l` and set `ALSA_CARD` or edit the script to pass
+  `-D plughw:CARD,DEV` to `arecord`.
 - **Wrong language / poor accuracy** — switch to a larger model
   (`small.en`, `medium.en`) or, for non-English audio, a multilingual
-  model like `small`/`medium` and pass `-l <lang>` to whisper-cli.
+  model (`small`, `medium`) and pass `-l <lang>` to whisper-cli via
+  `WHISPER_MODEL` pointing at the multilingual `.bin`.
 
 ## Contributing
 
