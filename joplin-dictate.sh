@@ -119,6 +119,7 @@ echo "Transcribing..."
     -otxt \
     -of "$TXT_BASE" \
     -nt \
+    --no-fallback \
     >/dev/null 2>&1
 
 if [[ ! -f "${TXT_BASE}.txt" ]]; then
