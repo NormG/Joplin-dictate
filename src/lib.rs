@@ -193,21 +193,19 @@ struct CreateResponse {
 
 pub fn run_workflow(config: &Config, options: &CreateOptions) -> Result<Option<CreatedNote>> {
     config.require_ready()?;
+    // Temp dir is used for transcription output only.
+    // When a pre-recorded audio_file is provided we use it directly rather
+    // than copying it, which avoids cross-device copy failures.
     let temp = TempDir::new().context("Failed to create temporary directory")?;
-    let wav = temp.path().join("recording.wav");
     let txt_base = temp.path().join("recording");
 
-    if let Some(audio_file) = &options.audio_file {
-        fs::copy(audio_file, &wav).with_context(|| {
-            format!(
-                "Failed to copy test audio from {} to {}",
-                audio_file.display(),
-                wav.display()
-            )
-        })?;
+    let wav: PathBuf = if let Some(audio_file) = &options.audio_file {
+        audio_file.clone()
     } else {
+        let wav = temp.path().join("recording.wav");
         record_audio(&wav)?;
-    }
+        wav
+    };
 
     if fs::metadata(&wav).map(|m| m.len()).unwrap_or(0) == 0 {
         bail!("No audio captured");
