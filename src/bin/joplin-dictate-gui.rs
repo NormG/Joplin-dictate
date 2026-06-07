@@ -174,6 +174,8 @@ fn build_ui(app: &Application) {
 
     let status = Label::new(Some(""));
     status.set_xalign(0.0);
+    status.set_selectable(true);
+    status.set_wrap(true);
     outer.append(&status);
 
     let ui = Ui {
