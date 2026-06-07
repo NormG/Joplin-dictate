@@ -56,6 +56,9 @@ impl Config {
         if self.joplin_token.trim().is_empty() {
             bail!("JOPLIN_TOKEN not set — enable Joplin Web Clipper and export the token");
         }
+        if which::which("pw-record").is_err() {
+            bail!("pw-record not found — install pipewire-utils: sudo dnf install pipewire-utils");
+        }
         if !self.whisper_bin.exists() {
             bail!(
                 "whisper-cli not found — build whisper.cpp first (missing: {})",
@@ -276,18 +279,18 @@ pub fn run_workflow(config: &Config, options: &CreateOptions) -> Result<Option<C
     }))
 }
 
-fn record_audio(config: &Config, wav: &Path) -> Result<()> {
+fn record_audio(_config: &Config, wav: &Path) -> Result<()> {
     println!("Recording... press Ctrl-C to stop.");
-    let mut child = Command::new("arecord")
-        .args(["-q", "-D", &config.alsa_device, "-f", "S16_LE", "-c", "1", "-r", "16000"])
+    let mut child = Command::new("pw-record")
+        .args(["--format=s16", "--rate=16000", "--channels=1"])
         .arg(wav)
         .spawn()
-        .context("Failed to start arecord")?;
+        .context("Failed to start pw-record")?;
 
-    // Let Ctrl-C stop arecord while keeping this process alive long enough to
-    // continue transcription, matching the original Bash script behavior.
+    // Let Ctrl-C stop pw-record while keeping this process alive long enough
+    // to continue transcription.
     let _ = ctrlc::set_handler(|| {});
-    let _ = child.wait().context("Failed while waiting for arecord")?;
+    let _ = child.wait().context("Failed while waiting for pw-record")?;
     Ok(())
 }
 
