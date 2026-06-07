@@ -207,8 +207,15 @@ pub fn run_workflow(config: &Config, options: &CreateOptions) -> Result<Option<C
         wav
     };
 
-    if fs::metadata(&wav).map(|m| m.len()).unwrap_or(0) == 0 {
-        bail!("No audio captured");
+    match fs::metadata(&wav) {
+        Err(_) => bail!(
+            "Audio file was not created — is arecord (alsa-utils) installed \
+             and your microphone connected?"
+        ),
+        Ok(m) if m.len() == 0 => bail!(
+            "Audio file is empty — arecord may have failed to access your microphone"
+        ),
+        Ok(_) => {}
     }
 
     transcribe(config, &wav, &txt_base)?;

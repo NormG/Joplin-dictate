@@ -9,7 +9,8 @@ use nix::sys::signal::{Signal, kill};
 use nix::unistd::Pid;
 use std::cell::RefCell;
 use std::path::PathBuf;
-use std::process::{Child, Command};
+use std::io::Read;
+use std::process::{Child, Command, Stdio};
 use std::rc::Rc;
 use std::sync::mpsc;
 use std::thread;
@@ -360,9 +361,12 @@ fn start_recording(ui: Ui) {
 fn start_arecord(options: CreateOptions) -> Result<RecordingState, String> {
     let temp = TempDir::new().map_err(|e| format!("Failed to create temp dir: {e}"))?;
     let wav = temp.path().join("recording.wav");
+    // Pipe stderr so we can surface arecord device errors to the status bar.
+    // -q is intentionally omitted here so errors are not silenced.
     let child = Command::new("arecord")
-        .args(["-q", "-f", "S16_LE", "-c", "1", "-r", "16000"])
+        .args(["-f", "S16_LE", "-c", "1", "-r", "16000"])
         .arg(&wav)
+        .stderr(Stdio::piped())
         .spawn()
         .map_err(|e| format!("Failed to start arecord: {e}"))?;
     Ok(RecordingState {
@@ -392,8 +396,29 @@ fn stop_recording(ui: Ui) {
     let (sender, receiver) = mpsc::channel::<Result<String, String>>();
     thread::spawn(move || {
         let result = (|| {
+            // Grab the stderr handle before wait() consumes the child.
+            let mut stderr_handle = state.child.stderr.take();
             let _ = state.child.wait();
             let _keep_temp_alive = state.temp;
+
+            // If the WAV is missing or empty, surface the arecord error message.
+            let wav_size = std::fs::metadata(&state.wav)
+                .map(|m| m.len())
+                .unwrap_or(0);
+            if wav_size == 0 {
+                let mut arecord_err = String::new();
+                if let Some(ref mut h) = stderr_handle {
+                    let _ = h.read_to_string(&mut arecord_err);
+                }
+                let arecord_err = arecord_err.trim().to_string();
+                return Err(if arecord_err.is_empty() {
+                    "No audio captured — check microphone is connected and not muted"
+                        .to_string()
+                } else {
+                    format!("arecord error: {arecord_err}")
+                });
+            }
+
             let config = Config::load().map_err(|e| e.to_string())?;
             state.options.audio_file = Some(state.wav);
             let created = run_workflow(&config, &state.options).map_err(|e| e.to_string())?;
