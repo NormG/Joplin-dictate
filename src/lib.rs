@@ -16,7 +16,6 @@ pub struct Config {
     pub whisper_bin: PathBuf,
     pub joplin_host: String,
     pub joplin_token: String,
-    pub alsa_device: String,
 }
 
 impl Config {
@@ -36,16 +35,12 @@ impl Config {
             .filter(|s| !s.trim().is_empty())
             .or_else(read_joplin_token_from_settings)
             .unwrap_or_default();
-        let alsa_device = env::var("ALSA_DEVICE")
-            .unwrap_or_else(|_| "pulse".to_string());
-
         Ok(Self {
             whisper_dir,
             whisper_model,
             whisper_bin,
             joplin_host,
             joplin_token,
-            alsa_device,
         })
     }
 
@@ -232,11 +227,11 @@ pub fn run_workflow(config: &Config, options: &CreateOptions) -> Result<Option<C
 
     match fs::metadata(&wav) {
         Err(_) => bail!(
-            "Audio file was not created — is arecord (alsa-utils) installed \
+            "Audio file was not created — is pw-record (pipewire-utils) installed \
              and your microphone connected?"
         ),
         Ok(m) if m.len() == 0 => bail!(
-            "Audio file is empty — arecord may have failed to access your microphone"
+            "Audio file is empty — pw-record may have failed to access your microphone"
         ),
         Ok(_) => {}
     }

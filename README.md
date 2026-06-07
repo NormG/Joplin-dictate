@@ -16,7 +16,7 @@ Everything runs locally — no audio is ever sent to a cloud service.
 
 ## Requirements
 
-- Linux with ALSA (`arecord` from `alsa-utils`)
+- Linux with PipeWire (`pw-record` from `pipewire-utils`)
 - [Joplin desktop](https://joplinapp.org) with Web Clipper enabled
 - [whisper.cpp](https://github.com/ggml-org/whisper.cpp) built locally with at
   least one model downloaded
@@ -31,12 +31,12 @@ Everything runs locally — no audio is ever sent to a cloud service.
 
 **Fedora:**
 ```bash
-sudo dnf install -y alsa-utils gtk4 curl git cmake gcc-c++ make
+sudo dnf install -y pipewire-utils gtk4 curl git cmake gcc-c++ make
 ```
 
 **Debian / Ubuntu:**
 ```bash
-sudo apt install -y alsa-utils libgtk-4-1 curl git cmake g++ make
+sudo apt install -y pipewire-utils libgtk-4-1 curl git cmake g++ make
 ```
 
 ### 2 — Install Joplin and enable Web Clipper
@@ -221,7 +221,7 @@ Search for **Joplin Dictate** in GNOME Activities to launch the GUI.
 
 ## How it works
 
-1. `arecord` records mono 16 kHz PCM audio until Stop is pressed (or EOF).
+1. `pw-record` records mono 16 kHz PCM audio via PipeWire until Stop is pressed.
 2. `whisper-cli` transcribes the WAV file using `--no-fallback`.
 3. Known hallucination tokens are stripped:
    `[Blank Audio]`, `[BLANK_AUDIO]`, `[ Silence ]`, `[noise]`, `[Music]`.

@@ -422,7 +422,7 @@ fn start_recording(ui: Ui) {
         audio_file: None,
     };
 
-    match start_arecord(options) {
+    match start_pw_record(options) {
         Ok(state) => {
             *ui.recording.borrow_mut() = Some(state);
             ui.record.set_label("⏹  Stop Recording");
@@ -439,11 +439,10 @@ fn start_recording(ui: Ui) {
     }
 }
 
-fn start_arecord(options: CreateOptions) -> Result<RecordingState, String> {
+fn start_pw_record(options: CreateOptions) -> Result<RecordingState, String> {
     let temp = TempDir::new().map_err(|e| format!("Failed to create temp dir: {e}"))?;
     let wav = temp.path().join("recording.wav");
-    // Pipe stderr so we can surface arecord device errors to the status bar.
-    // -q is intentionally omitted here so errors are not silenced.
+    // Pipe stderr so we can surface pw-record errors in the status bar.
     let child = Command::new("pw-record")
         .args(["--format=s16", "--rate=16000", "--channels=1"])
         .arg(&wav)
@@ -482,21 +481,21 @@ fn stop_recording(ui: Ui) {
             let _ = state.child.wait();
             let _keep_temp_alive = state.temp;
 
-            // If the WAV is missing or empty, surface the arecord error message.
+            // If the WAV is missing or empty, surface the pw-record error.
             let wav_size = std::fs::metadata(&state.wav)
                 .map(|m| m.len())
                 .unwrap_or(0);
             if wav_size == 0 {
-                let mut arecord_err = String::new();
+                let mut record_err = String::new();
                 if let Some(ref mut h) = stderr_handle {
-                    let _ = h.read_to_string(&mut arecord_err);
+                    let _ = h.read_to_string(&mut record_err);
                 }
-                let arecord_err = arecord_err.trim().to_string();
-                return Err(if arecord_err.is_empty() {
+                let record_err = record_err.trim().to_string();
+                return Err(if record_err.is_empty() {
                     "No audio captured — check microphone is connected and not muted"
                         .to_string()
                 } else {
-                    format!("arecord error: {arecord_err}")
+                    format!("Recording error: {record_err}")
                 });
             }
 
