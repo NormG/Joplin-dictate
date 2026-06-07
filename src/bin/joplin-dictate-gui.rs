@@ -4,7 +4,7 @@ use gtk4::{
     CssProvider, Entry, Grid, Label, Orientation, Popover, STYLE_PROVIDER_PRIORITY_APPLICATION,
     SpinButton, gdk,
 };
-use joplin_dictate::{Config, CreateOptions, Folder, list_folders, run_workflow};
+use joplin_dictate::{Config, CreateOptions, Folder, create_folder, list_folders, run_workflow};
 use nix::sys::signal::{Signal, kill};
 use nix::unistd::Pid;
 use std::cell::RefCell;
@@ -110,11 +110,17 @@ fn build_ui(app: &Application) {
     outer.append(&grid);
 
     attach_label(&grid, "Notebook:", 0);
+    let nb_row = GtkBox::new(Orientation::Horizontal, 4);
     let notebook = ComboBoxText::new();
     notebook.append(Some(""), "— default notebook —");
     notebook.set_active_id(Some(""));
     notebook.set_hexpand(true);
-    grid.attach(&notebook, 1, 0, 1, 1);
+    nb_row.append(&notebook);
+    let new_nb_btn = Button::with_label("+");
+    new_nb_btn.set_tooltip_text(Some("Create new notebook"));
+    new_nb_btn.set_sensitive(false);
+    nb_row.append(&new_nb_btn);
+    grid.attach(&nb_row, 1, 0, 1, 1);
 
     attach_label(&grid, "Title:", 1);
     let title = Entry::new();
@@ -178,6 +184,8 @@ fn build_ui(app: &Application) {
     status.set_wrap(true);
     outer.append(&status);
 
+    wire_new_notebook(&notebook, &new_nb_btn, &status);
+
     let ui = Ui {
         notebook,
         title,
@@ -196,7 +204,7 @@ fn build_ui(app: &Application) {
     };
 
     wire_events(&ui);
-    run_startup_checks(ui);
+    run_startup_checks_with_nb_btn(ui, new_nb_btn);
     window.present();
 }
 
@@ -204,6 +212,76 @@ fn attach_label(grid: &Grid, text: &str, row: i32) {
     let label = Label::new(Some(text));
     label.set_xalign(1.0);
     grid.attach(&label, 0, row, 1, 1);
+}
+
+fn wire_new_notebook(notebook: &ComboBoxText, new_nb_btn: &Button, status: &Label) {
+    let nb_entry = Entry::new();
+    nb_entry.set_placeholder_text(Some("Notebook name"));
+    nb_entry.set_width_chars(24);
+
+    let nb_create = Button::with_label("Create");
+
+    let pop_box = GtkBox::new(Orientation::Vertical, 6);
+    pop_box.set_margin_top(8);
+    pop_box.set_margin_bottom(8);
+    pop_box.set_margin_start(8);
+    pop_box.set_margin_end(8);
+    pop_box.append(&nb_entry);
+    pop_box.append(&nb_create);
+
+    let nb_popover = Popover::new();
+    nb_popover.set_child(Some(&pop_box));
+    nb_popover.set_parent(new_nb_btn);
+
+    {
+        let nb_popover = nb_popover.clone();
+        new_nb_btn.connect_clicked(move |_| nb_popover.popup());
+    }
+
+    {
+        let notebook = notebook.clone();
+        let nb_entry = nb_entry.clone();
+        let nb_popover = nb_popover.clone();
+        let status = status.clone();
+        nb_create.connect_clicked(move |_| {
+            let name = nb_entry.text().trim().to_string();
+            if name.is_empty() {
+                status.set_text("Enter a notebook name first.");
+                return;
+            }
+            let (sender, receiver) = mpsc::channel::<Result<Folder, String>>();
+            let name_clone = name.clone();
+            thread::spawn(move || {
+                let result = (|| {
+                    let config = Config::load().map_err(|e| e.to_string())?;
+                    create_folder(&config, &name_clone).map_err(|e| e.to_string())
+                })();
+                let _ = sender.send(result);
+            });
+            let notebook = notebook.clone();
+            let nb_entry = nb_entry.clone();
+            let nb_popover = nb_popover.clone();
+            let status = status.clone();
+            gtk4::glib::timeout_add_local(Duration::from_millis(100), move || {
+                match receiver.try_recv() {
+                    Ok(Ok(folder)) => {
+                        notebook.append(Some(&folder.id), &folder.title);
+                        notebook.set_active_id(Some(&folder.id));
+                        nb_entry.set_text("");
+                        nb_popover.popdown();
+                        status.set_text(&format!("Created notebook: {}", folder.title));
+                        gtk4::glib::ControlFlow::Break
+                    }
+                    Ok(Err(e)) => {
+                        status.set_text(&format!("Failed to create notebook: {e}"));
+                        gtk4::glib::ControlFlow::Break
+                    }
+                    Err(mpsc::TryRecvError::Empty) => gtk4::glib::ControlFlow::Continue,
+                    Err(mpsc::TryRecvError::Disconnected) => gtk4::glib::ControlFlow::Break,
+                }
+            });
+        });
+    }
 }
 
 fn wire_events(ui: &Ui) {
@@ -276,7 +354,7 @@ fn clear_due(ui: &Ui) {
     ui.calendar_popover.popdown();
 }
 
-fn run_startup_checks(ui: Ui) {
+fn run_startup_checks_with_nb_btn(ui: Ui, new_nb_btn: Button) {
     ui.status.set_text("Checking environment…");
     let (sender, receiver) = mpsc::channel::<Result<Vec<Folder>, String>>();
     thread::spawn(move || {
@@ -298,6 +376,7 @@ fn run_startup_checks(ui: Ui) {
                         }
                         ui.status.set_text("Ready.");
                         ui.record.set_sensitive(true);
+                        new_nb_btn.set_sensitive(true);
                     }
                     Err(e) => {
                         ui.status.set_text(&format!("⚠  {e}"));

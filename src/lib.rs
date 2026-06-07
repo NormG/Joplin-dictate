@@ -165,6 +165,22 @@ pub fn list_folders(config: &Config) -> Result<Vec<Folder>> {
     Ok(folders)
 }
 
+pub fn create_folder(config: &Config, title: &str) -> Result<Folder> {
+    #[derive(Serialize)]
+    struct Payload<'a> {
+        title: &'a str,
+    }
+    Client::new()
+        .post(api_url(config, "folders"))
+        .json(&Payload { title })
+        .send()
+        .context("Failed to create Joplin notebook")?
+        .error_for_status()
+        .context("Joplin notebook creation returned an error")?
+        .json()
+        .context("Failed to parse notebook creation response")
+}
+
 fn api_url(config: &Config, path: &str) -> String {
     format!(
         "{}/{}?token={}",
