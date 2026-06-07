@@ -1,13 +1,13 @@
-# JDmusings
+# Joplin Dictate
 
-JDmusings records audio from your microphone, transcribes it locally with
+Joplin Dictate records audio from your microphone, transcribes it locally with
 [whisper.cpp](https://github.com/ggml-org/whisper.cpp), and creates a note
 or to-do in [Joplin](https://joplinapp.org) through the Web Clipper API.
 Everything runs locally — no audio is ever sent to a cloud service.
 
 ## Features
 
-- CLI (`jdmusings`) and GTK4 GUI (`jdmusings-gui`)
+- CLI (`joplin-dictate`) and GTK4 GUI (`joplin-dictate-gui`)
 - Transcription via whisper.cpp with `--no-fallback` for fewer false words
 - Hallucination-token filtering (`[BLANK_AUDIO]`, `[ Silence ]`, etc.)
 - Creates regular notes **or** Joplin to-dos with an optional due date
@@ -46,7 +46,7 @@ curl -s https://raw.githubusercontent.com/laurent22/joplin/dev/Joplin_install_an
 ```
 
 Launch Joplin, then go to **Tools → Options → Web Clipper** and enable the
-service. JDmusings reads the token automatically from
+service. Joplin Dictate reads the token automatically from
 `~/.config/joplin-desktop/settings.json`, or you can set `JOPLIN_TOKEN`.
 
 ### 3 — Build whisper.cpp
@@ -60,16 +60,16 @@ bash ~/whisper.cpp/models/download-ggml-model.sh base.en
 
 For better accuracy use `small.en` or `medium.en` and set `WHISPER_MODEL`.
 
-### 4 — Get JDmusings binaries
+### 4 — Get Joplin Dictate binaries
 
 #### Option A — Download from GitHub Releases (recommended)
 
 Visit the [latest release](https://github.com/NormG/Joplin-dictate/releases/latest)
-and download `jdmusings` and `jdmusings-gui`, then:
+and download `joplin-dictate` and `joplin-dictate-gui`, then:
 
 ```bash
-chmod +x jdmusings jdmusings-gui
-mv jdmusings jdmusings-gui ~/.local/bin/
+chmod +x joplin-dictate joplin-dictate-gui
+mv joplin-dictate joplin-dictate-gui ~/.local/bin/
 ```
 
 #### Option B — Build from source
@@ -94,45 +94,45 @@ Build:
 ```bash
 cargo build --release --bins
 # Binaries land at:
-#   target/release/jdmusings
-#   target/release/jdmusings-gui
+#   target/release/joplin-dictate
+#   target/release/joplin-dictate-gui
 ```
 
 ## CLI usage
 
 Record and create a note (title derived from transcript):
 ```bash
-jdmusings
+joplin-dictate
 ```
 
 Custom title:
 ```bash
-jdmusings --title "Meeting notes"
+joplin-dictate --title "Meeting notes"
 ```
 
 Create a to-do:
 ```bash
-jdmusings --todo
+joplin-dictate --todo
 ```
 
 Create a to-do with a due date:
 ```bash
-jdmusings --todo --due "2026-09-10 16:30"
+joplin-dictate --todo --due "2026-09-10 16:30"
 ```
 
 Create a note in a specific notebook (use the notebook's Joplin folder ID):
 ```bash
-jdmusings --parent FOLDER_ID
+joplin-dictate --parent FOLDER_ID
 ```
 
 Combine flags — titled to-do with due date in a specific notebook:
 ```bash
-jdmusings --title "Submit report" --todo --due "2026-09-15 09:00" --parent FOLDER_ID
+joplin-dictate --title "Submit report" --todo --due "2026-09-15 09:00" --parent FOLDER_ID
 ```
 
 Smoke-test using an existing WAV file (no microphone needed):
 ```bash
-jdmusings --title "Test note" --audio-file ~/whisper.cpp/samples/jfk.wav
+joplin-dictate --title "Test note" --audio-file ~/whisper.cpp/samples/jfk.wav
 ```
 
 Full flag reference:
@@ -150,13 +150,13 @@ Options:
 ## GUI usage
 
 ```bash
-jdmusings-gui
+joplin-dictate-gui
 ```
 
 ### Workflow
 
 1. Start Joplin and confirm Web Clipper is enabled.
-2. Launch `jdmusings-gui` and wait for **Ready.** in the status bar.
+2. Launch `joplin-dictate-gui` and wait for **Ready.** in the status bar.
 3. Pick a notebook from the dropdown.
 4. (Optional) Enter a custom title.
 5. (Optional) Check **To-do** and choose a due date with the calendar picker.
@@ -175,29 +175,29 @@ REPO="$HOME/Projects/joplin-dictate"
 
 mkdir -p ~/.local/bin ~/.local/share/applications ~/.local/share/icons/hicolor/scalable/apps
 
-cp "$REPO/jdmusings.svg" ~/.local/share/icons/hicolor/scalable/apps/
+cp "$REPO/joplin-dictate.svg" ~/.local/share/icons/hicolor/scalable/apps/
 
-cat > ~/.local/bin/jdmusings <<SH
+cat > ~/.local/bin/joplin-dictate <<SH
 #!/usr/bin/env bash
-exec "$REPO/target/release/jdmusings" "\$@"
+exec "$REPO/target/release/joplin-dictate" "\$@"
 SH
-chmod +x ~/.local/bin/jdmusings
+chmod +x ~/.local/bin/joplin-dictate
 
-cat > ~/.local/bin/jdmusings-gui <<SH
+cat > ~/.local/bin/joplin-dictate-gui <<SH
 #!/usr/bin/env bash
-exec "$REPO/target/release/jdmusings-gui" "\$@"
+exec "$REPO/target/release/joplin-dictate-gui" "\$@"
 SH
-chmod +x ~/.local/bin/jdmusings-gui
+chmod +x ~/.local/bin/joplin-dictate-gui
 
-cat > ~/.local/share/applications/jdmusings.desktop <<EOF
+cat > ~/.local/share/applications/joplin-dictate.desktop <<EOF
 [Desktop Entry]
 Version=1.0
 Type=Application
-Name=JDmusings
+Name=Joplin Dictate
 GenericName=Voice Note Recorder
 Comment=Record voice notes and send them straight to Joplin
-Exec=$HOME/.local/bin/jdmusings-gui
-Icon=jdmusings
+Exec=$HOME/.local/bin/joplin-dictate-gui
+Icon=joplin-dictate
 Terminal=false
 Categories=AudioVideo;Utility;
 Keywords=joplin;note;dictate;voice;microphone;record;transcribe;whisper;todo;
@@ -208,7 +208,7 @@ update-desktop-database ~/.local/share/applications/
 gtk-update-icon-cache -f -t ~/.local/share/icons/hicolor/ || true
 ```
 
-Search for **JDmusings** in GNOME Activities to launch the GUI.
+Search for **Joplin Dictate** in GNOME Activities to launch the GUI.
 
 ## Environment variables
 
@@ -225,7 +225,7 @@ Search for **JDmusings** in GNOME Activities to launch the GUI.
 2. `whisper-cli` transcribes the WAV file using `--no-fallback`.
 3. Known hallucination tokens are stripped:
    `[Blank Audio]`, `[BLANK_AUDIO]`, `[ Silence ]`, `[noise]`, `[Music]`.
-4. If no speech text remains, JDmusings exits without creating a note.
+4. If no speech text remains, Joplin Dictate exits without creating a note.
 5. The first sentence of the transcript becomes the note title (unless
    `--title` is given).
 6. If a due date is set, it is stored in Joplin's `todo_due` metadata field

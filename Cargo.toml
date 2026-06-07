@@ -1,6 +1,6 @@
 [package]
-name = "jdmusings"
-version = "0.1.0"
+name = "joplin-dictate"
+version = "0.2.0"
 edition = "2024"
 
 [dependencies]
@@ -19,13 +19,13 @@ urlencoding = "2"
 which = "8"
 
 [lib]
-name = "jdmusings"
+name = "joplin_dictate"
 path = "src/lib.rs"
 
 [[bin]]
-name = "jdmusings"
-path = "src/bin/jdmusings.rs"
+name = "joplin-dictate"
+path = "src/bin/joplin-dictate.rs"
 
 [[bin]]
-name = "jdmusings-gui"
-path = "src/bin/jdmusings-gui.rs"
+name = "joplin-dictate-gui"
+path = "src/bin/joplin-dictate-gui.rs"

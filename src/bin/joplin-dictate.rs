@@ -1,11 +1,11 @@
 use anyhow::Result;
 use clap::Parser;
-use jdmusings::{Config, CreateOptions, run_workflow};
+use joplin_dictate::{Config, CreateOptions, run_workflow};
 use std::path::PathBuf;
 
 #[derive(Debug, Parser)]
 #[command(
-    name = "jdmusings",
+    name = "joplin-dictate",
     version,
     about = "Record voice, transcribe locally with whisper.cpp, and create a Joplin note or to-do"
 )]

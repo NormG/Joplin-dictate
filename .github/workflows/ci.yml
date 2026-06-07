@@ -111,13 +111,13 @@ jobs:
         run: cargo build --release --bins
 
       - name: Smoke-test CLI --help
-        run: ./target/release/jdmusings --help
+        run: ./target/release/joplin-dictate --help
 
       - name: Upload release binaries
         uses: actions/upload-artifact@v4
         with:
-          name: jdmusings-linux-x86_64
+          name: joplin-dictate-linux-x86_64
           path: |
-            target/release/jdmusings
-            target/release/jdmusings-gui
+            target/release/joplin-dictate
+            target/release/joplin-dictate-gui
           retention-days: 7

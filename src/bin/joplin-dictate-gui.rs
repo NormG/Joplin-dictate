@@ -4,7 +4,7 @@ use gtk4::{
     CssProvider, Entry, Grid, Label, Orientation, Popover, STYLE_PROVIDER_PRIORITY_APPLICATION,
     SpinButton, gdk,
 };
-use jdmusings::{Config, CreateOptions, Folder, list_folders, run_workflow};
+use joplin_dictate::{Config, CreateOptions, Folder, list_folders, run_workflow};
 use nix::sys::signal::{Signal, kill};
 use nix::unistd::Pid;
 use std::cell::RefCell;
@@ -16,7 +16,7 @@ use std::thread;
 use std::time::Duration;
 use tempfile::TempDir;
 
-const APP_ID: &str = "dev.normg.JDmusings";
+const APP_ID: &str = "dev.normg.joplin-dictate";
 
 #[derive(Clone)]
 struct Ui {
@@ -93,7 +93,7 @@ fn build_ui(app: &Application) {
     install_recording_button_css();
     let window = ApplicationWindow::builder()
         .application(app)
-        .title("JDmusings")
+        .title("Joplin Dictate")
         .default_width(460)
         .resizable(false)
         .build();
