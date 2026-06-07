@@ -37,7 +37,7 @@ impl Config {
             .or_else(read_joplin_token_from_settings)
             .unwrap_or_default();
         let alsa_device = env::var("ALSA_DEVICE")
-            .unwrap_or_else(|_| "plughw:Generic,0".to_string());
+            .unwrap_or_else(|_| "pulse".to_string());
 
         Ok(Self {
             whisper_dir,
