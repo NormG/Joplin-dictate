@@ -16,6 +16,7 @@ pub struct Config {
     pub whisper_bin: PathBuf,
     pub joplin_host: String,
     pub joplin_token: String,
+    pub alsa_device: String,
 }
 
 impl Config {
@@ -35,6 +36,8 @@ impl Config {
             .filter(|s| !s.trim().is_empty())
             .or_else(read_joplin_token_from_settings)
             .unwrap_or_default();
+        let alsa_device = env::var("ALSA_DEVICE")
+            .unwrap_or_else(|_| "plughw:Generic,0".to_string());
 
         Ok(Self {
             whisper_dir,
@@ -42,6 +45,7 @@ impl Config {
             whisper_bin,
             joplin_host,
             joplin_token,
+            alsa_device,
         })
     }
 
@@ -203,7 +207,7 @@ pub fn run_workflow(config: &Config, options: &CreateOptions) -> Result<Option<C
         audio_file.clone()
     } else {
         let wav = temp.path().join("recording.wav");
-        record_audio(&wav)?;
+        record_audio(config, &wav)?;
         wav
     };
 
@@ -272,10 +276,10 @@ pub fn run_workflow(config: &Config, options: &CreateOptions) -> Result<Option<C
     }))
 }
 
-fn record_audio(wav: &Path) -> Result<()> {
+fn record_audio(config: &Config, wav: &Path) -> Result<()> {
     println!("Recording... press Ctrl-C to stop.");
     let mut child = Command::new("arecord")
-        .args(["-q", "-f", "S16_LE", "-c", "1", "-r", "16000"])
+        .args(["-q", "-D", &config.alsa_device, "-f", "S16_LE", "-c", "1", "-r", "16000"])
         .arg(wav)
         .spawn()
         .context("Failed to start arecord")?;

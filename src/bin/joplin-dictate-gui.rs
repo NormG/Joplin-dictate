@@ -363,8 +363,9 @@ fn start_arecord(options: CreateOptions) -> Result<RecordingState, String> {
     let wav = temp.path().join("recording.wav");
     // Pipe stderr so we can surface arecord device errors to the status bar.
     // -q is intentionally omitted here so errors are not silenced.
+    let config = Config::load().map_err(|e| format!("Config error: {e}"))?;
     let child = Command::new("arecord")
-        .args(["-f", "S16_LE", "-c", "1", "-r", "16000"])
+        .args(["-D", &config.alsa_device, "-f", "S16_LE", "-c", "1", "-r", "16000"])
         .arg(&wav)
         .stderr(Stdio::piped())
         .spawn()
