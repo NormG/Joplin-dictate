@@ -24,6 +24,7 @@ struct Ui {
     notebook: ComboBoxText,
     title: Entry,
     todo: CheckButton,
+    polish: CheckButton,
     due_button: Button,
     calendar: Calendar,
     calendar_popover: Popover,
@@ -152,6 +153,9 @@ fn build_ui(app: &Application) {
     due_row.append(&minute);
     grid.attach(&due_row, 1, 3, 1, 1);
 
+    let polish = CheckButton::with_label("Polish with AI");
+    grid.attach(&polish, 1, 4, 1, 1);
+
     let calendar = Calendar::new();
     let popover_box = GtkBox::new(Orientation::Vertical, 6);
     popover_box.set_margin_top(8);
@@ -190,6 +194,7 @@ fn build_ui(app: &Application) {
         notebook,
         title,
         todo,
+        polish,
         due_button,
         calendar,
         calendar_popover,
@@ -420,6 +425,7 @@ fn start_recording(ui: Ui) {
         is_todo: is_todo || due.is_some(),
         due,
         audio_file: None,
+        polish: ui.polish.is_active(),
     };
 
     match start_pw_record(options) {
@@ -463,8 +469,13 @@ fn stop_recording(ui: Ui) {
     };
 
     ui.record.set_sensitive(false);
-    ui.status.set_text("Transcribing and creating note…");
-    ui.record.set_label("▶  Start Recording");
+    let status_msg = if state.options.polish {
+        "Transcribing, polishing, and creating note\u{2026}"
+    } else {
+        "Transcribing and creating note\u{2026}"
+    };
+    ui.status.set_text(status_msg);
+    ui.record.set_label("\u{25b6}  Start Recording");
     ui.record.remove_css_class("destructive-action");
     ui.record.remove_css_class("recording");
     ui.record.add_css_class("ready-record");

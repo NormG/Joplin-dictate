@@ -16,6 +16,8 @@ pub struct Config {
     pub whisper_bin: PathBuf,
     pub joplin_host: String,
     pub joplin_token: String,
+    pub llm_url: String,
+    pub llm_model: String,
 }
 
 impl Config {
@@ -35,12 +37,18 @@ impl Config {
             .filter(|s| !s.trim().is_empty())
             .or_else(read_joplin_token_from_settings)
             .unwrap_or_default();
+        let llm_url = env::var("LLM_URL")
+            .unwrap_or_else(|_| "http://192.168.2.249:1234".to_string());
+        let llm_model = env::var("LLM_MODEL")
+            .unwrap_or_else(|_| "qwen/qwen3-coder-30b".to_string());
         Ok(Self {
             whisper_dir,
             whisper_model,
             whisper_bin,
             joplin_host,
             joplin_token,
+            llm_url,
+            llm_model,
         })
     }
 
@@ -192,6 +200,7 @@ pub struct CreateOptions {
     pub is_todo: bool,
     pub due: Option<String>,
     pub audio_file: Option<PathBuf>,
+    pub polish: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -248,6 +257,13 @@ pub fn run_workflow(config: &Config, options: &CreateOptions) -> Result<Option<C
     if text.trim().is_empty() {
         return Ok(None);
     }
+
+    let text = if options.polish {
+        println!("Polishing transcript\u{2026}");
+        polish_transcript(config, &text)?
+    } else {
+        text
+    };
 
     let title = options
         .title
@@ -361,6 +377,68 @@ pub fn parse_due(raw: &str) -> Result<(i64, String)> {
     Ok((ms, human))
 }
 
+pub fn polish_transcript(config: &Config, text: &str) -> Result<String> {
+    #[derive(Serialize)]
+    struct Msg<'a> {
+        role: &'a str,
+        content: &'a str,
+    }
+    #[derive(Serialize)]
+    struct Req<'a> {
+        model: &'a str,
+        messages: Vec<Msg<'a>>,
+        max_tokens: u32,
+        temperature: f32,
+    }
+    #[derive(Deserialize)]
+    struct MsgContent {
+        content: String,
+    }
+    #[derive(Deserialize)]
+    struct Choice {
+        message: MsgContent,
+    }
+    #[derive(Deserialize)]
+    struct Resp {
+        choices: Vec<Choice>,
+    }
+
+    let url = format!(
+        "{}/v1/chat/completions",
+        config.llm_url.trim_end_matches('/')
+    );
+    let system = "You are a transcript editor. Correct the following voice transcript. \
+        Fix ALL grammar errors including subject-verb agreement (e.g. 'they was' → 'they were', \
+        'there was no any' → 'there were no'), incorrect word order, and awkward phrasing. \
+        Add correct punctuation and capitalisation. Remove filler words such as 'um', 'uh', \
+        'like', and 'you know'. Do not change the meaning or invent content. \
+        Return only the corrected text, nothing else.";
+    let req = Req {
+        model: &config.llm_model,
+        messages: vec![
+            Msg { role: "system", content: system },
+            Msg { role: "user", content: text },
+        ],
+        max_tokens: 2048,
+        temperature: 0.3,
+    };
+    let resp: Resp = Client::new()
+        .post(&url)
+        .json(&req)
+        .send()
+        .context("Failed to reach LLM server")?
+        .error_for_status()
+        .context("LLM server returned an error")?
+        .json()
+        .context("Failed to parse LLM response")?;
+    resp.choices
+        .into_iter()
+        .next()
+        .map(|c| c.message.content.trim().to_string())
+        .filter(|s| !s.is_empty())
+        .ok_or_else(|| anyhow!("LLM returned empty response"))
+}
+
 fn create_joplin_note(
     config: &Config,
     options: &CreateOptions,
@@ -405,6 +483,18 @@ fn create_joplin_note(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    #[ignore = "requires live LLM server at LLM_URL"]
+    fn test_polish_transcript_live() {
+        let config = Config::load().unwrap();
+        let raw = "um so i need to uh call the dentist tomorrow \
+            and also pick up groceries like milk and eggs";
+        let polished = polish_transcript(&config, raw).unwrap();
+        println!("Input:    {raw}");
+        println!("Polished: {polished}");
+        assert!(!polished.is_empty(), "LLM returned empty output");
+    }
 
     #[test]
     fn filters_known_tokens_and_preserves_speech() {

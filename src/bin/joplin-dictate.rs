@@ -29,6 +29,10 @@ struct Args {
     /// Use an existing WAV file instead of recording from the microphone
     #[arg(long = "audio-file")]
     audio_file: Option<PathBuf>,
+
+    /// Polish the transcript with the local LLM before creating the note
+    #[arg(short = 'P', long = "polish")]
+    polish: bool,
 }
 
 fn main() -> Result<()> {
@@ -40,6 +44,7 @@ fn main() -> Result<()> {
         is_todo: args.todo || args.due.is_some(),
         due: args.due,
         audio_file: args.audio_file,
+        polish: args.polish,
     };
 
     match run_workflow(&config, &options)? {
